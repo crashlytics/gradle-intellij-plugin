@@ -14,7 +14,7 @@ class RunIdeaTask extends JavaExec {
         description = "Runs Intellij IDEA with installed plugin."
         setMain("com.intellij.idea.Main")
 
-        extension = project.extensions.findByName(IntelliJPlugin.EXTENSION_NAME) as IntelliJPluginExtension
+        extension = project.extensions.findByName(IntelliJPluginExtension.NAME) as IntelliJPluginExtension
         enableAssertions = true
         workingDir = project.file("$extension.ideaDirectory/bin/")
 

@@ -27,7 +27,7 @@ class PrepareSandboxTask extends Sync {
         libraries = plugin.addChild().into("lib")
         metaInf = plugin.addChild().into("META-INF")
 
-        def extension = project.extensions.findByName(IntelliJPlugin.EXTENSION_NAME) as IntelliJPluginExtension
+        def extension = project.extensions.findByName(IntelliJPluginExtension.NAME) as IntelliJPluginExtension
         destinationDir = new File(extension.sandboxDirectory, "plugins")
         plugin.into(extension.pluginName)
         classes.from(Utils.mainSourceSet(project).output)
