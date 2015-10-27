@@ -26,7 +26,6 @@ import org.jetbrains.annotations.Nullable
 
 class IntelliJPlugin implements Plugin<Project> {
     public static final GROUP_NAME = "intellij"
-    public static final EXTENSION_NAME = "intellij"
     public static final LOG = Logging.getLogger(IntelliJPlugin)
 
     private static final CONFIGURATION_NAME = "intellij"
@@ -38,7 +37,7 @@ class IntelliJPlugin implements Plugin<Project> {
     @Override
     def void apply(Project project) {
         project.getPlugins().apply(JavaPlugin)
-        def intellijExtension = project.extensions.create(EXTENSION_NAME, IntelliJPluginExtension)
+        def intellijExtension = project.extensions.create(IntelliJPluginExtension.NAME, IntelliJPluginExtension)
         intellijExtension.with {
             plugins = []
             version = DEFAULT_IDEA_VERSION
@@ -48,8 +47,9 @@ class IntelliJPlugin implements Plugin<Project> {
             updateSinceUntilBuild = true
             intellijRepo = DEFAULT_INTELLIJ_REPO
             downloadSources = true
-            publish = new IntelliJPluginExtension.Publish()
         }
+
+        project.intellij.extensions.create(PublishExtension.NAME, IntelliJPluginExtension.Publish)
         configurePlugin(project, intellijExtension)
     }
 
