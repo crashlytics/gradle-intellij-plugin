@@ -1,6 +1,6 @@
 package org.jetbrains.intellij
 
-static class PublishExtension {
+class PublishExtension {
 
     public static final NAME = "publish"
 

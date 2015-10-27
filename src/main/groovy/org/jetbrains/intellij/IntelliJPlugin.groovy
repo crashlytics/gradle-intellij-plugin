@@ -49,7 +49,7 @@ class IntelliJPlugin implements Plugin<Project> {
             downloadSources = true
         }
 
-        project.intellij.extensions.create(PublishExtension.NAME, IntelliJPluginExtension.Publish)
+        project.intellij.extensions.create(PublishExtension.NAME, PublishExtension)
         configurePlugin(project, intellijExtension)
     }
 

@@ -19,7 +19,7 @@ class PublishTask extends DefaultTask {
     @SuppressWarnings("GroovyUnusedDeclaration")
     @TaskAction
     protected void publishPlugin() {
-        def extension = project.extensions.findByName(IntelliJPlugin.EXTENSION_NAME) as IntelliJPluginExtension
+        def extension = project.extensions.findByName(IntelliJPluginExtension.NAME) as IntelliJPluginExtension
         if (extension != null) {
             boolean misconfigurated = false
             if (!extension.publish.pluginId) {
