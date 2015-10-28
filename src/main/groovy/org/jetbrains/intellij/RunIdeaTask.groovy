@@ -3,7 +3,7 @@ package org.jetbrains.intellij
 import org.gradle.api.tasks.JavaExec
 import org.gradle.internal.jvm.Jvm
 
-class RunIdeaTask extends JavaExec {
+public class RunIdeaTask extends JavaExec {
     public static String NAME = "runIdea"
 
     private IntelliJPluginExtension extension

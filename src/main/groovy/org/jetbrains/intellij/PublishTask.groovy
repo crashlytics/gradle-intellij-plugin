@@ -1,13 +1,14 @@
 package org.jetbrains.intellij
+
 import groovyx.net.http.HTTPBuilder
 import groovyx.net.http.Method
 import org.apache.http.entity.mime.MultipartEntityBuilder
 import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.TaskExecutionException
-import org.gradle.api.tasks.bundling.Zip
 
-class PublishTask extends DefaultTask {
+public class PublishTask extends DefaultTask {
     public static String NAME = "publishPlugin"
 
     public PublishTask() {
@@ -15,6 +16,9 @@ class PublishTask extends DefaultTask {
         group = IntelliJPlugin.GROUP_NAME
         description = "Publish plugin distribution on plugins.jetbrains.com."
     }
+
+    @InputFile
+    public File distributionFile = null
 
     @SuppressWarnings("GroovyUnusedDeclaration")
     @TaskAction
@@ -38,8 +42,6 @@ class PublishTask extends DefaultTask {
                 return
             }
 
-            def buildPluginTask = project.tasks.findByName(IntelliJPlugin.BUILD_PLUGIN_TASK_NAME) as Zip
-            def distributionFile = buildPluginTask.archivePath
             if (!distributionFile.exists()) {
                 IntelliJPlugin.LOG.error("Cannot find distribution to upload: $distributionFile.absolutePath")
                 return
