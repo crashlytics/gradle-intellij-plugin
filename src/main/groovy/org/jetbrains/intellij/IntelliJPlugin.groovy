@@ -2,6 +2,7 @@ package org.jetbrains.intellij
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.query.ArtifactResolutionQuery
@@ -47,6 +48,13 @@ class IntelliJPlugin implements Plugin<Project> {
             updateSinceUntilBuild = true
             intellijRepo = DEFAULT_INTELLIJ_REPO
             downloadSources = true
+            configureDependencies = true
+            initializeTasks = true
+            runIdeaTask = null
+            prepareSandboxTask = null
+            patchPluginXmlTask = null
+            publishTask = null
+            buildPluginTask = null
         }
 
         project.intellij.extensions.create(PublishExtension.NAME, PublishExtension)
@@ -55,20 +63,41 @@ class IntelliJPlugin implements Plugin<Project> {
 
     private static def configurePlugin(@NotNull Project project, @NotNull IntelliJPluginExtension extension) {
         project.afterEvaluate {
-            LOG.info("Preparing IntelliJ IDEA dependency task")
-            configureIntelliJDependency(it, extension)
-            configurePluginDependencies(it, extension)
-            configureInstrumentTask(it, extension)
-            if (Utils.sourcePluginXmlFiles(it)) {
-                configurePatchPluginXmlTask(it)
-                configurePrepareSandboxTask(it)
-                configureRunIdeaTask(it)
-                configureBuildPluginTask(it, extension)
-                configurePublishPluginTask(it)
-            } else {
-                LOG.warn("File not found: plugin.xml. IntelliJ specific tasks will be unavailable.")
+            LOG.info("Preparing IntelliJ IDEA tasks")
+            if (extension.configureDependencies) {
+                configureIntelliJDependency(it, extension)
+                configurePluginDependencies(it, extension)
             }
-            configureTestTasks(it, extension)
+
+            if (extension.instrumentCode) {
+                project.tasks.withType(JavaCompile)*.doLast(new IntelliJInstrumentCodeAction())
+            }
+
+            if (extension.initializeTasks) {
+                if (Utils.sourcePluginXmlFiles(it)) {
+                    // Setup tasks
+                    extension.patchPluginXmlTask = project.tasks.create(PatchPluginXmlTask.NAME, PatchPluginXmlTask)
+                    extension.prepareSandboxTask = project.tasks.create(PrepareSandboxTask.NAME, PrepareSandboxTask)
+                    extension.runIdeaTask = project.tasks.create(RunIdeaTask.NAME, RunIdeaTask)
+                    extension.buildPluginTask = configureBuildPluginTask(it, extension)
+                    extension.publishTask = project.tasks.create(PublishTask.NAME, PublishTask) {
+                        it.distributionFile = extension.buildPluginTask.archivePath
+                    }
+
+                    // Wire tasks together
+                    extension.patchPluginXmlTask.dependsOn(project.getTasksByName(JavaPlugin.CLASSES_TASK_NAME, false))
+                    project.getTasksByName(JavaPlugin.JAR_TASK_NAME, false)*.dependsOn(extension.patchPluginXmlTask)
+                    project.getTasksByName(LifecycleBasePlugin.ASSEMBLE_TASK_NAME, false)*.dependsOn(extension.buildPluginTask)
+
+                    extension.prepareSandboxTask.dependsOn(extension.patchPluginXmlTask)
+                    extension.runIdeaTask.dependsOn(extension.prepareSandboxTask)
+                    extension.buildPluginTask.dependsOn(extension.prepareSandboxTask)
+                    extension.publishTask.dependsOn(extension.buildPluginTask)
+                } else {
+                    LOG.warn("File not found: plugin.xml. IntelliJ specific tasks will be unavailable.")
+                }
+                configureTestTasks(it, extension)
+            }
         }
     }
 
@@ -136,35 +165,12 @@ class IntelliJPlugin implements Plugin<Project> {
         return null
     }
 
-    private static void configurePatchPluginXmlTask(@NotNull Project project) {
-        LOG.info("Configuring patch plugin.xml task")
-        PatchPluginXmlTask task = project.tasks.create(PatchPluginXmlTask.NAME, PatchPluginXmlTask);
-        task.dependsOn(project.getTasksByName(JavaPlugin.CLASSES_TASK_NAME, false))
-        project.getTasksByName(JavaPlugin.JAR_TASK_NAME, false)*.dependsOn(task)
-    }
-
-    private static void configurePrepareSandboxTask(@NotNull Project project) {
-        LOG.info("Configuring prepare IntelliJ sandbox task")
-        project.tasks.create(PrepareSandboxTask.NAME, PrepareSandboxTask)
-                .dependsOn(project.getTasksByName(PatchPluginXmlTask.NAME, false))
-    }
-
-    private static void configureRunIdeaTask(@NotNull Project project) {
-        LOG.info("Configuring run IntelliJ task")
-        project.tasks.create(RunIdeaTask.NAME, RunIdeaTask)
-                .dependsOn(project.getTasksByName(PrepareSandboxTask.NAME, false))
-    }
-
-    private static void configureInstrumentTask(@NotNull Project project, @NotNull IntelliJPluginExtension extension) {
-        if (!extension.instrumentCode) return
-        LOG.info("Configuring IntelliJ compile tasks")
-        project.tasks.withType(JavaCompile)*.doLast(new IntelliJInstrumentCodeAction())
-    }
-
     private static void configureTestTasks(@NotNull Project project, @NotNull IntelliJPluginExtension extension) {
         LOG.info("Configuring IntelliJ tests tasks")
         project.tasks.withType(Test).each {
-            it.dependsOn(project.getTasksByName(PrepareSandboxTask.NAME, false))
+            if (extension.prepareSandboxTask != null) {
+                it.dependsOn(extension.prepareSandboxTask)
+            }
             it.enableAssertions = true
             it.systemProperties = Utils.getIdeaSystemProperties(project, it.systemProperties, extension, true)
             it.systemProperty("java.system.class.loader", "com.intellij.util.lang.UrlClassLoader")
@@ -177,24 +183,15 @@ class IntelliJPlugin implements Plugin<Project> {
         }
     }
 
-    private static void configureBuildPluginTask(@NotNull Project project, @NotNull IntelliJPluginExtension extension) {
-        LOG.info("Configuring building IntelliJ IDEA plugin task")
-        def prepareSandboxTask = project.tasks.findByName(PrepareSandboxTask.NAME) as PrepareSandboxTask
+    private static Task configureBuildPluginTask(@NotNull Project project,
+                                                 @NotNull IntelliJPluginExtension extension) {
         project.tasks.create(BUILD_PLUGIN_TASK_NAME, Zip).with {
             description = "Bundles the project as a distribution."
             group = GROUP_NAME
             baseName = extension.pluginName
-            from("$prepareSandboxTask.destinationDir/$extension.pluginName")
+            from("$extension.prepareSandboxTask.destinationDir/$extension.pluginName")
             into(extension.pluginName)
-            dependsOn(project.getTasksByName(PrepareSandboxTask.NAME, false))
-            project.getTasksByName(LifecycleBasePlugin.ASSEMBLE_TASK_NAME, false)*.dependsOn(it)
         }
-    }
-
-    private static void configurePublishPluginTask(@NotNull Project project) {
-        LOG.info("Configuring publishing IntelliJ IDEA plugin task")
-        project.tasks.create(PublishTask.NAME, PublishTask)
-                .dependsOn(project.getTasksByName(BUILD_PLUGIN_TASK_NAME, false))
     }
 
     @NotNull

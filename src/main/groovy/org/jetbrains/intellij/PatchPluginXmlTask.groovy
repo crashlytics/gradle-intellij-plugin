@@ -6,7 +6,7 @@ import org.gradle.api.tasks.TaskAction
 
 import java.util.regex.Pattern
 
-class PatchPluginXmlTask extends DefaultTask {
+public class PatchPluginXmlTask extends DefaultTask {
     public static final String NAME = "patchPluginXml"
     private static final Pattern VERSION_PATTERN = Pattern.compile('^[A-Z]{2}-([0-9.A-z]+)\\s*$')
 
@@ -50,7 +50,7 @@ class PatchPluginXmlTask extends DefaultTask {
     }
 
     def getSinceUntilBuild() {
-        def extension = project.extensions.findByName(IntelliJPlugin.EXTENSION_NAME) as IntelliJPluginExtension
+        def extension = project.extensions.findByName(IntelliJPluginExtension.NAME) as IntelliJPluginExtension
         if (extension != null && extension.updateSinceUntilBuild) {
             try {
                 def matcher = VERSION_PATTERN.matcher(new File(extension.ideaDirectory, "build.txt").getText('UTF-8'))

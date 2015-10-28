@@ -8,7 +8,7 @@ import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.tasks.Sync
 import org.jetbrains.annotations.NotNull
 
-class PrepareSandboxTask extends Sync {
+public class PrepareSandboxTask extends Sync {
     public static String NAME = "prepareSandbox"
 
     CopySpec plugin
